@@ -21,6 +21,8 @@
 #include <thread>
 #ifndef _WIN32
 #  include <signal.h>
+#else
+#  include <windows.h>          // SetConsoleOutputCP — CMD'de UTF-8 Türkçe
 #endif
 
 using namespace ui;
@@ -69,6 +71,9 @@ static int CmdSelftest(const std::string& country) {
 }
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    SetConsoleOutputCP(65001);       // CMD UTF-8 — “ü/ş/ö” harfleri bozulmadan görünür
+#endif
     gt::net::init();
     gt::LogInit();
 #ifndef _WIN32

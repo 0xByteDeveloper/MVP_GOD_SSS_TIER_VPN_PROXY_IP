@@ -237,11 +237,20 @@ inline const std::map<std::string, std::string>& files() {
     </div>
 
     <div class="mrow">
-      <label class="mk">Oto-yakala (süreç adı)</label>
-      <input id="mCapture" class="mv" type="text" placeholder="metin2client.exe, game.exe (virgülle)" spellcheck="false">
+      <label class="mk">Oto-yakala modu</label>
+      <select id="mCapMode" class="mv">
+        <option value="0">MOD 1 — İLK N (kapasiteye kadar; doluysa sıradaki kutu)</option>
+        <option value="1">MOD 2 — HEPSİ (o adı taşıyan tüm süreçler; açık olanlar bile)</option>
+      </select>
+      <div id="mCapModeNote" class="mnote"></div>
     </div>
 
     <div class="mrow">
+      <label class="mk">Oto-yakala (süreç adı)</label>
+      <input id="mCapture" class="mv" type="text" placeholder="brave.exe · metin2client.exe, game.exe (virgülle)" spellcheck="false">
+    </div>
+
+    <div class="mrow" id="rowMaxProcs">
       <label class="mk">Kutu süreç kapasitesi</label>
       <input id="mMaxProcs" class="mv" type="number" min="1" max="16" value="1" style="max-width:90px">
       <span class="mnote">bu kutuya aynı anda bağlanacak süreç sayısı (doluysa sıradaki kutu)</span>
@@ -348,7 +357,7 @@ function renderTiles() {
     }
     const enc = inst.enc_mode || "auto";
     const cap = inst.capture
-      ? `<div class="tile-cap" title="oto-yakalama desenleri">🎯 ${esc(inst.capture)}</div>` : "";
+      ? `<div class="tile-cap" title="oto-yakalama desenleri">🎯 ${esc(inst.capture)}${inst.capture_mode === 1 ? ' <b class="mag">MOD2-hepsi</b>' : ""}</div>` : "";
     const prov = PROV_NAMES[inst.provider] || inst.provider;
     const status = inst.status === "OVPN"
       ? `<span class="st OVPN">OVPN</span>`
@@ -484,7 +493,7 @@ function renderDash() {
         <div class="s">tls sürüm / zincir katmanı</div></div>
       <div class="dbox"><div class="k">Oto-yakala</div>
         <div class="v">${esc(i.capture || "—")}</div>
-        <div class="s">kapasite ${i.max_procs} süreç · doluysa sıradaki kutuya</div></div>
+        <div class="s">${i.capture_mode === 1 ? "MOD 2 — HEPSİ: o adı taşıyan tüm süreçler (açık olanlar bile)" : `MOD 1 — kapasite ${i.max_procs} süreç · doluysa sıradaki kutuya`}</div></div>
       <div class="dbox"><div class="k">Ülke</div>
         <div class="v">${esc(i.country || "—")}</div>
         <div class="s">${i.provider === "vpngate" ? "VPN Gate sunucu ülkesi" : "zgettunnels country="}</div></div>
@@ -530,6 +539,7 @@ function openModal(slotIdx, editId) {
     : "hola";
   const editInst = editId ? state.instances.find((i) => i.id === editId) : null;
   $("mLabel").value = editInst ? editInst.label : "";
+  $("mCapMode").value = editInst && editInst.capture_mode === 1 ? "1" : "0";
   $("mCapture").value = editInst ? editInst.capture || "" : "";
   $("mMaxProcs").value = editInst ? editInst.max_procs || 1 : 1;
   $("mAddr").value = editInst ? (editInst.upstream_addr || "") : "";
@@ -539,6 +549,7 @@ function openModal(slotIdx, editId) {
   $("btnModalSave").textContent = editId ? "AYARLARI GÜNCELLE" : "KUTUYU DOLDUR (instance oluştur)";
   providerUI();
   encNote();
+  capModeUI();
   $("modal").classList.add("on");
 }
 $("btnModalCancel").onclick = () => $("modal").classList.remove("on");
@@ -549,7 +560,7 @@ $("modal").onclick = (e) => {
 function providerUI() {
   const p = $("mProvider").value;
   $("mProviderNote").textContent = PROV_NOTES[p] || "";
-  $("rowCountry").style.display = p === "hola" ? "" : "none";
+  $("rowCountry").style.display = p === "hola" || p === "vpngate" ? "" : "none";
   $("rowVgServer").style.display = p === "vpngate" ? "" : "none";
   $("rowAddr").style.display = p === "plain" || p === "socks" ? "" : "none";
   $("rowHops").style.display = p === "chain" ? "" : "none";
@@ -557,6 +568,21 @@ function providerUI() {
 }
 
 $("mProvider").onchange = providerUI;
+
+// ---- Oto-yakala MOD seçimi ------------------------------------------------------
+function capModeUI() {
+  const mod2 = $("mCapMode").value === "1";
+  $("mCapModeNote").textContent = mod2
+    ? "brave.exe yazarsan brave'in HEPSİ, chrome yazarsan chrome'un hepsi bağlanır — " +
+      "şu an process olarak açıksa bile anında yakalanır (kapasite sınırsız)"
+    : "ilk açılan süreçler kapasiteye kadar bu kutuya girer; doluysa sıradaki " +
+      "eşleşen kutuya geçer (ör: 1. metin2client → kutu1, 2.si → kutu3)";
+  const row = $("rowMaxProcs");
+  row.style.opacity = mod2 ? "0.4" : "1";
+  $("mMaxProcs").disabled = mod2;
+  row.title = mod2 ? "MOD 2'de kapasite sınırsız — hepsi bağlanır" : "";
+}
+$("mCapMode").onchange = capModeUI;
 
 function encNote() {
   const id = $("mEnc").value;
@@ -575,27 +601,63 @@ async function loadEnc() {
   encNote();
 }
 
+// ---- VPN Gate sunucu listesi (kutu içi) — akış: bekleme göstergesi + tek-çekme güvencesi ----
+let vgLoading = false;
 async function loadVgServersIntoModal() {
-  const country = $("mCountry").value || "";
-  const d = await api("/api/vpngate?country=" + encodeURIComponent(country) + "&limit=15");
-  state.vgServers = d.servers || [];
-  $("mVgServer").innerHTML = state.vgServers
-    .map((s) => `<option value="${esc(s.hostname)}" data-idx="${state.vgServers.indexOf(s)}">` +
-      `${esc(s.hostname)} — ${esc(s.country)} ${esc(s.speed)} ping ${s.ping_ms}ms</option>`)
-    .join("") || '<option value="">(liste boş — ülkeyi değiştir)</option>';
+  if (vgLoading) return;                    // paralel ikinci çekmeyi önle
+  vgLoading = true;
+  const btn = $("btnVgLoad");
+  const sel = $("mVgServer");
+  btn.disabled = true;
+  btn.textContent = "çekiliyor…";
+  const hadSel = modal.vgServer ? modal.vgServer.hostname : sel.value;
+  sel.innerHTML = '<option value="">(çekiliyor — ilk istek 10-25 sn sürebilir; motor 5 dk önbellek tutar)</option>';
+  try {
+    const country = $("mCountry").value || "";
+    const d = await api("/api/vpngate?country=" + encodeURIComponent(country) + "&limit=15");
+    state.vgServers = d.servers || [];
+    if (!state.vgServers.length && modal.vgServer) {
+      // ağ aksadıysa: KUTU YAP ile tıklanan sunucu tek seçenek olarak kalır
+      state.vgServers = [modal.vgServer];
+    }
+    sel.innerHTML = state.vgServers
+      .map((s, k) => `<option value="${esc(s.hostname)}" data-idx="${k}">` +
+        `${esc(s.hostname)} — ${esc(s.country)} ${esc(s.speed)} ping ${s.ping_ms}ms</option>`)
+      .join("") || `<option value="">(liste boş${d.err ? " — " + esc(d.err) : " — ülkeyi değiştir"})</option>`;
+    if (hadSel && state.vgServers.some((x) => x.hostname === hadSel)) sel.value = hadSel;
+  } finally {
+    vgLoading = false;
+    btn.disabled = false;
+    btn.textContent = "listeyi çek";
+  }
 }
 
-$("btnVgLoad").onclick = loadVgServersIntoModal;
+$("btnVgLoad").onclick = () => loadVgServersIntoModal();
 $("mCountry").onchange = () => {
   if ($("mProvider").value === "vpngate") loadVgServersIntoModal();
 };
 
+// ülke select'inde olmayan kodu ekle (VPN Gate ülkesi Hola listesinde olmayabilir)
+function setCountryOption(code) {
+  if (!code) return;
+  const sel = $("mCountry");
+  if (![...sel.options].some((o) => o.value === code)) {
+    const o = document.createElement("option");
+    o.value = code;
+    o.textContent = code + " (VPN Gate)";
+    sel.appendChild(o);
+  }
+  sel.value = code;
+}
+
 $("btnModalSave").onclick = async () => {
   $("modalErr").textContent = "";
+  const capMode = $("mCapMode").value === "1" ? 1 : 0;
   if (modal.editId) {
-    // yalnız kutu ayarları (etiket/oto-yakala/kapasite)
+    // kutu ayarları (etiket/oto-yakala modu/oto-yakala/kapasite)
     const r = await apiPost("/api/inst/" + modal.editId + "/settings", {
       capture: $("mCapture").value.trim(),
+      capture_mode: capMode,
       max_procs: +$("mMaxProcs").value || 1,
       label: $("mLabel").value.trim(),
     });
@@ -607,11 +669,12 @@ $("btnModalSave").onclick = async () => {
   const provider = $("mProvider").value;
   const body = {
     provider,
-    country: provider === "vpngate" ? $("mCountry").value : $("mCountry").value,
+    country: $("mCountry").value,
     label: $("mLabel").value.trim(),
     enc: $("mEnc").value,
     capture: $("mCapture").value.trim(),
-    max_procs: +$("mMaxProcs").value || 1,
+    capture_mode: capMode,
+    max_procs: capMode === 1 ? 1 : (+$("mMaxProcs").value || 1),
     addr: $("mAddr").value.trim(),
     hops: $("mHops").value.trim()
       ? $("mHops").value.trim().split(",").map((s) => s.trim()).filter(Boolean)
@@ -803,18 +866,18 @@ async function fetchVgTable() {
     b.onclick = () => {
       const s = state.vgServers[+b.dataset.vg];
       if (!s) return;
-      // AYARLAR modalını vpngate+hazır sunucu ile aç
+      // AYARLAR modalını vpngate + tıklanan sunucu ile aç (tek çekme, doğru ülke)
       openModal(-1, 0);
+      modal.vgServer = s;               // çekince otomatik seçilir
       $("mProvider").disabled = false;
+      setCountryOption(s.country || "TR");
       $("mProvider").value = "vpngate";
-      providerUI();
-      $("mCountry").value = s.country || "TR";
-      loadVgServersIntoModal().then(() => {
-        state.vgServers = [s].concat(state.vgServers);
-        $("mVgServer").innerHTML =
-          `<option value="${esc(s.hostname)}" data-idx="0" selected>` +
-          `${esc(s.hostname)} — ${esc(s.country)} ${esc(s.speed)} ping ${s.ping_ms}ms</option>`;
-      });
+      providerUI();                     // liste otomatik çekilir (önbellek → anında)
+      // ağ aksarsa tıklanan sunucu tek seçenek olarak durur
+      state.vgServers = [s].concat(state.vgServers);
+      $("mVgServer").innerHTML =
+        `<option value="${esc(s.hostname)}" data-idx="0" selected>` +
+        `${esc(s.hostname)} — ${esc(s.country)} ${esc(s.speed)} ping ${s.ping_ms}ms</option>`;
     };
   });
 }

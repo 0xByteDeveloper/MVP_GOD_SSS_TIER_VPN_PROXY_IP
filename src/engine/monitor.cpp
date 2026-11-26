@@ -219,12 +219,32 @@ void Monitor::loop() {
     }
 }
 
-// ---- OTO-YAKALA ---------------------------------------------------------------
-// Instance kutularının capture desenleri ("metin2client.exe, game.exe") eşleşen
-// yeni süreçleri otomatik bağlar://   * kutu sırayla dolaşılır (id artan): desen eşleşen İLK BOŞ kutuya atanır
-//   * dolu kutu atlanır → sıradaki eşleşen kutu (kullanıcının metin2 senaryosu:
-//     ilk metin2client → instance1, ikincisi → instance3, instance1 doluysa
-//     ilk açılan instance3'e bağlanır)
+// ---- OTO-YAKALA (MOD 1 / MOD 2) ------------------------------------------------
+// MOD 1 (capture_mode=0) — İLK N: desen eşleşen YENİ açılan süreç kutuya
+//   bağlanır (kapasiteye kadar); kutu doluysa sıradaki eşleşen kutu alır
+//   (kullanıcının metin2 senaryosu: 1. metin2client → inst1, 2. → inst3,
+//   inst1 doluysa ilk açılan inst3'e bağlanır).
+// MOD 2 (capture_mode=1) — HEPSİ: yazılan adı taşıyan TÜM süreçler bu kutuya
+//   bağlanır: brave.exe → tüm brave'ler, chrome → tüm chromelar; ŞU AN AÇIK
+//   OLANLAR BİLE anında yakalanır (her tarama mevcut süreçleri de tarar).
+static bool capture_match(const std::string& capture, const std::string& nm,
+                          const std::string& cm) {
+    for (auto& pat : split(capture, ',')) {
+        std::string pt = lower(trim(pat));
+        if (pt.empty()) continue;
+        if (nm == pt || cm == pt ||
+            (pt.size() > 15 && nm == pt.substr(0, 15))) return true;   // /proc 15 kr. kısaltma
+    }
+    return false;
+}
+static bool pid_in_any_box(const std::vector<Instance*>& insts, long pid) {
+    for (auto* in2 : insts) {
+        std::lock_guard<std::mutex> g2(in2->mu);
+        for (long ap : in2->attached_pids)
+            if (ap == pid) return true;
+    }
+    return false;
+}
 void Monitor::auto_capture() {
     auto insts = mgr_->list();                 // id artan sıra
     bool any = false;
@@ -233,11 +253,55 @@ void Monitor::auto_capture() {
 
     auto procs = list_processes();
     uint64_t now = now_ms();
+
+    // ---- MOD 2 — HEPSİ: (önce çalışır — açıkta olanlar anında yakalanır) ----
+    for (auto* in : insts) {
+        if (in->capture.empty() || in->capture_mode != 1) continue;
+        for (auto& p : procs) {
+            if (p.pid <= 4) continue;                    // çekirdek iş parçacıkları
+            std::string nm = lower(p.name);
+            std::string cm;
+            if (!p.cmdline.empty()) {
+                std::string first = p.cmdline.substr(0, p.cmdline.find(' '));
+                size_t sl = first.rfind('/');
+                if (sl != std::string::npos) first = first.substr(sl + 1);
+                cm = lower(first);
+            }
+            if (!capture_match(in->capture, nm, cm)) continue;
+            {   // bu kutuda zaten mi? (yeniden ekleme yapma)
+                std::lock_guard<std::mutex> g2(in->mu);
+                bool mine = false;
+                for (long ap : in->attached_pids) if (ap == p.pid) { mine = true; break; }
+                if (mine) continue;
+            }
+            if (pid_in_any_box(insts, p.pid)) continue;  // başka kutudaysa dokunma
+            std::string aerr;
+            mgr_->attach(in->id, p.pid, p.name, aerr);
+            {
+                std::lock_guard<std::mutex> g2(mu_);
+                J e = J::makeObj();
+                e["ts"] = now_iso();
+                e["type"] = "AUTO_ASSIGN";
+                e["pid"] = p.pid;
+                e["pname"] = p.name;
+                e["remote"] = "oto-yakala MOD2 (hepsi)";
+                e["via"] = "inst#" + std::to_string(in->id) + " " + in->label +
+                            " (" + in->provider + "/" + in->country + ")";
+                events_.push_back(e);
+                ev_seq_++;
+                if (events_.size() > 2000)
+                    events_.erase(events_.begin(), events_.begin() + 1000);
+            }
+            gt::LogLine(LogColor::Magenta,
+                "[oto-yakala MOD2] %s (pid %ld) -> inst#%d %s (%s) — hepsi modu",
+                p.name.c_str(), p.pid, in->id, in->label.c_str(), in->provider.c_str());
+        }
+    }
+
+    // ---- MOD 1 — İLK N: yeni açılan süreçler (kapasite + sıradaki kutuya geçiş) ----
     for (auto& p : procs) {
         if (known_pids_.count(p.pid)) continue;
         known_pids_[p.pid] = now;
-        // Linux /proc/<pid>/stat 'comm' alanı 15 karakterle sınırlıdır (örn.
-        // "metin2client.ex") — cmdline taban adıyla VE kısaltmayla eşleştir
         std::string nm = lower(p.name);
         std::string cm;
         if (!p.cmdline.empty()) {
@@ -247,24 +311,9 @@ void Monitor::auto_capture() {
             cm = lower(first);
         }
         for (auto* in : insts) {
-            if (in->capture.empty()) continue;
-            bool match = false;
-            for (auto& pat : split(in->capture, ',')) {
-                std::string pt = lower(trim(pat));
-                if (pt.empty()) continue;
-                if (nm == pt || cm == pt ||
-                    (pt.size() > 15 && nm == pt.substr(0, 15))) { match = true; break; }
-            }
-            if (!match) continue;
-            // pid zaten bir kutuda mı? (çift atamayı önle)
-            bool elsewhere = false;
-            for (auto* in2 : insts) {
-                std::lock_guard<std::mutex> g2(in2->mu);
-                for (long ap : in2->attached_pids)
-                    if (ap == p.pid) { elsewhere = true; break; }
-                if (elsewhere) break;
-            }
-            if (elsewhere) break;
+            if (in->capture.empty() || in->capture_mode != 0) continue;
+            if (!capture_match(in->capture, nm, cm)) continue;
+            if (pid_in_any_box(insts, p.pid)) break;    // çift atamayı önle
             {
                 std::lock_guard<std::mutex> g2(in->mu);
                 if ((int)in->attached_pids.size() >= in->max_procs) continue;  // dolu → sıradaki kutu
@@ -278,7 +327,7 @@ void Monitor::auto_capture() {
                 e["type"] = "AUTO_ASSIGN";
                 e["pid"] = p.pid;
                 e["pname"] = p.name;
-                e["remote"] = "oto-yakalama";
+                e["remote"] = "oto-yakala";
                 e["via"] = "inst#" + std::to_string(in->id) + " " + in->label +
                             " (" + in->provider + "/" + in->country + ")";
                 events_.push_back(e);

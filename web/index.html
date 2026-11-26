@@ -223,11 +223,20 @@
     </div>
 
     <div class="mrow">
-      <label class="mk">Oto-yakala (süreç adı)</label>
-      <input id="mCapture" class="mv" type="text" placeholder="metin2client.exe, game.exe (virgülle)" spellcheck="false">
+      <label class="mk">Oto-yakala modu</label>
+      <select id="mCapMode" class="mv">
+        <option value="0">MOD 1 — İLK N (kapasiteye kadar; doluysa sıradaki kutu)</option>
+        <option value="1">MOD 2 — HEPSİ (o adı taşıyan tüm süreçler; açık olanlar bile)</option>
+      </select>
+      <div id="mCapModeNote" class="mnote"></div>
     </div>
 
     <div class="mrow">
+      <label class="mk">Oto-yakala (süreç adı)</label>
+      <input id="mCapture" class="mv" type="text" placeholder="brave.exe · metin2client.exe, game.exe (virgülle)" spellcheck="false">
+    </div>
+
+    <div class="mrow" id="rowMaxProcs">
       <label class="mk">Kutu süreç kapasitesi</label>
       <input id="mMaxProcs" class="mv" type="number" min="1" max="16" value="1" style="max-width:90px">
       <span class="mnote">bu kutuya aynı anda bağlanacak süreç sayısı (doluysa sıradaki kutu)</span>

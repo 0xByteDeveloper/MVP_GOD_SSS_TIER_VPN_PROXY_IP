@@ -9,18 +9,58 @@
 #include "net/net.h"
 #include <algorithm>
 #include <cstring>
+#include <mutex>
 
 namespace gt {
 
 // ---- VPN Gate ----------------------------------------------------------------
+// 5 dakikalık önbellek: aynı listeyi (tablo → kutu → çek akışı) tekrar tekrar
+// indirmez — ikinci istek anında döner ("çek" düğmesi artık bekletmez)
+static std::mutex g_vg_mu;
+static uint64_t g_vg_ts = 0;
+static std::vector<VpnGateServer> g_vg_cache;
+
 std::vector<VpnGateServer> vpngate_fetch(const std::string& country, int limit,
                                          std::string& err) {
-    std::vector<VpnGateServer> out;
     std::string want = country.empty() ? "" : upper(country);
+    if (limit <= 0) limit = 15;
+    const int cap = 60;                       // dahili tam liste üst sınırı
+
+    auto finish = [&](std::vector<VpnGateServer>& full) -> std::vector<VpnGateServer> {
+        std::sort(full.begin(), full.end(), [](const VpnGateServer& a, const VpnGateServer& b) {
+            return a.score > b.score;
+        });
+        {   // tam listeyi önbelleğe al (ülke filtresiz — filtreleme hafızada)
+            std::lock_guard<std::mutex> g(g_vg_mu);
+            g_vg_cache = full; g_vg_ts = now_ms();
+        }
+        std::vector<VpnGateServer> out;
+        for (auto& s : full) {
+            if (!want.empty() && upper(s.country_short) != want) continue;
+            out.push_back(s);
+            if ((int)out.size() >= limit) break;
+        }
+        return out;
+    };
+
+    {   // önbellek isabeti — 5 dk içinde liste anında döner (çek beklemesiz)
+        std::lock_guard<std::mutex> g(g_vg_mu);
+        if (!g_vg_cache.empty() && now_ms() - g_vg_ts < 300000) {
+            std::vector<VpnGateServer> out;
+            for (auto& s : g_vg_cache) {
+                if (!want.empty() && upper(s.country_short) != want) continue;
+                out.push_back(s);
+                if ((int)out.size() >= limit) break;
+            }
+            return out;
+        }
+    }
+
+    std::vector<VpnGateServer> full;
 
     // 1) resmi CSV (kullanıcı PC'inde — ev IP'sinde — çalışır)
     {
-        auto r = net::http_get("http://www.vpngate.net/api/iphone/", 25);
+        auto r = net::http_get("http://www.vpngate.net/api/iphone/", 12);
         if (r.ok() && r.body.size() > 10000 &&
             r.body.find("hostname") != std::string::npos) {
             auto lines = split(r.body, '\n');
@@ -35,7 +75,7 @@ std::vector<VpnGateServer> vpngate_fetch(const std::string& country, int limit,
             int i_ovpn = need("openvpn_configdata_base64"), i_sess = need("vpn_session");
             int i_up = need("uptime");
             if (i_host >= 0 && i_ovpn >= 0 && i_cs >= 0) {
-                for (size_t k = 2; k < lines.size() && (int)out.size() < limit; k++) {
+                for (size_t k = 2; k < lines.size() && (int)full.size() < cap; k++) {
                     std::string ln = trim(lines[k]);
                     if (ln.empty()) continue;
                     if (ln.rfind("*END*", 0) == 0) break;
@@ -47,46 +87,40 @@ std::vector<VpnGateServer> vpngate_fetch(const std::string& country, int limit,
                     s.ip = getc(i_host);
                     s.country_short = getc(i_cs);
                     s.country_long = getc(i_cl);
-                    if (!want.empty() && upper(s.country_short) != want) continue;
                     s.score = atoll(getc(i_score).c_str());
                     s.ping_ms = atoll(getc(i_ping).c_str());
                     s.speed_bps = atoll(getc(i_speed).c_str());
                     s.sessions = atoll(getc(i_sess).c_str());
                     s.uptime_days = atoll(getc(i_up).c_str()) / 86400;
                     s.ovpn_b64 = getc(i_ovpn);
-                    out.push_back(s);
+                    full.push_back(s);
                 }
             }
         }
     }
-    if (!out.empty()) {
-        std::sort(out.begin(), out.end(), [](const VpnGateServer& a, const VpnGateServer& b) {
-            return a.score > b.score;
-        });
-        return out;
-    }
+    if (!full.empty()) return finish(full);
 
     // 2) GitHub aynası — veri merkezi IP'lerinde resmi API boş HTML döner;
     //    fdciabdul/Vpngate-Scraper-API saatlik anlık görüntü (JSON)
     {
         auto r = net::http_get(
             "https://raw.githubusercontent.com/fdciabdul/Vpngate-Scraper-API/main/json/data.json",
-            30);
+            15);
         if (!r.ok() || r.body.empty()) {
             err = "vpngate: resmi CSV ve ayna da erişilemedi (HTTP " +
-                  std::to_string(r.status) + ")";
-            return out;
+                  std::to_string(r.status) + " — " + r.err + ")";
+            return full;
         }
         J j;
-        if (!J::parse(r.body, j)) { err = "vpngate ayna JSON çözülemedi"; return out; }
+        if (!J::parse(r.body, j)) { err = "vpngate ayna JSON çözülemedi"; return full; }
         const J* root = nullptr;
         if (j.t == J::ARR && !j.arr.empty() && j.arr[0].t == J::OBJ) root = &j.arr[0];
         else if (j.t == J::OBJ) root = &j;
-        if (!root) { err = "vpngate ayna biçimi beklenmedik"; return out; }
+        if (!root) { err = "vpngate ayna biçimi beklenmedik"; return full; }
         const J* servers = root->find("servers");
-        if (!servers || servers->t != J::ARR) { err = "vpngate ayna 'servers' yok"; return out; }
+        if (!servers || servers->t != J::ARR) { err = "vpngate ayna 'servers' yok"; return full; }
         for (auto& s : servers->arr) {
-            if ((int)out.size() >= limit) break;
+            if ((int)full.size() >= cap) break;
             VpnGateServer v;
             v.hostname = s.s("hostname");
             v.ip = s.s("ip");
@@ -99,14 +133,12 @@ std::vector<VpnGateServer> vpngate_fetch(const std::string& country, int limit,
             v.uptime_days = atoll(s.s("uptime").c_str()) / 86400;
             v.ovpn_b64 = s.s("openvpn_configdata_base64");
             if (v.hostname.empty() || v.ovpn_b64.empty()) continue;
-            if (!want.empty() && upper(v.country_short) != want) continue;
-            out.push_back(v);
+            full.push_back(v);
         }
     }
-    std::sort(out.begin(), out.end(), [](const VpnGateServer& a, const VpnGateServer& b) {
-        return a.score > b.score;
-    });
-    return out;
+    if (!full.empty()) return finish(full);
+    if (err.empty()) err = "vpngate: liste boş (ağ filtresi?)";
+    return full;
 }
 
 std::string vpngate_speed_mbps(long long speed_bps) {

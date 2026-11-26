@@ -35,6 +35,7 @@ J Instance::to_json() const {
     o["port"] = local_port;
     o["enc_mode"] = enc_mode;
     o["capture"] = capture;
+    o["capture_mode"] = capture_mode;
     o["max_procs"] = max_procs;
     o["exit_ip"] = exit_ip;
     o["exit_country"] = exit_country;
@@ -173,7 +174,13 @@ Instance* InstanceManager::create(const CreateOpts& o, std::string& err) {
     inst->label = o.label.empty() ? derive_label(o.provider) : o.label;
     inst->enc_mode = o.enc.empty() ? "auto" : o.enc;
     inst->capture = o.capture;
+    inst->capture_mode = (o.capture_mode == 1) ? 1 : 0;
     inst->max_procs = o.max_procs > 0 ? o.max_procs : 1;
+    if (inst->capture_mode == 1)
+        gt::LogLine(LogColor::Magenta,
+                    "[inst#%d] OTO-YAKALA MOD 2 — '%s' adını taşıyan TÜM süreçler "
+                    "(şu an açık olanlar bile) bu kutuya bağlanacak",
+                    inst->id, inst->capture.c_str());
     inst->created_ms = now_ms();
 
     UpstreamConfig up;
@@ -336,6 +343,8 @@ Instance* InstanceManager::create(const CreateOpts& o, std::string& err) {
         e["country"] = o.country;
         e["enc"] = inst->enc_mode;
         e["capture"] = inst->capture;
+        e["capture_mode"] = inst->capture_mode;
+        e["max_procs"] = inst->max_procs;
         if (!inst->uuid.empty()) e["uuid"] = inst->uuid.substr(0, 8);
         if (!inst->upstream_addr.empty()) e["endpoint"] = inst->upstream_addr;
         if (!inst->hops_addrs.empty()) {
@@ -474,11 +483,18 @@ bool InstanceManager::refresh(int id, std::string& err) {
 
 bool InstanceManager::update_settings(int id, const std::string& capture, int max_procs,
                                      const std::string& label, std::string& err) {
+    return update_settings(id, capture, max_procs, -1, label, err);
+}
+
+bool InstanceManager::update_settings(int id, const std::string& capture, int max_procs,
+                                     int capture_mode, const std::string& label,
+                                     std::string& err) {
     Instance* in = find(id);
     if (!in) { err = "instance yok"; return false; }
     {
         std::lock_guard<std::mutex> g2(in->mu);
         if (!capture.empty()) in->capture = capture;
+        if (capture_mode >= 0) in->capture_mode = capture_mode == 1 ? 1 : 0;
         if (max_procs > 0) in->max_procs = max_procs;
         if (!label.empty()) in->label = label;
     }
@@ -486,10 +502,12 @@ bool InstanceManager::update_settings(int id, const std::string& capture, int ma
     e["ts"] = now_iso();
     e["type"] = "SETTINGS";
     e["capture"] = in->capture;
+    e["capture_mode"] = in->capture_mode;
     e["max_procs"] = in->max_procs;
     in->user_log_append(e.dump());
-    gt::LogOk("[inst#%d %s] kutu ayarları güncellendi (oto-yakala: %s, max %d)",
-              in->id, in->label.c_str(), in->capture.c_str(), in->max_procs);
+    gt::LogOk("[inst#%d %s] kutu ayarları güncellendi (oto-yakala MOD%d: %s, max %d)",
+              in->id, in->label.c_str(), in->capture_mode + 1, in->capture.c_str(),
+              in->max_procs);
     save();
     return true;
 }
@@ -683,6 +701,7 @@ void InstanceManager::save() {
             o["label"] = i->label;
             o["enc_mode"] = i->enc_mode;
             o["capture"] = i->capture;
+            o["capture_mode"] = i->capture_mode;
             o["max_procs"] = i->max_procs;
             o["uuid"] = i->uuid;
             o["login"] = i->login;
@@ -741,6 +760,7 @@ void InstanceManager::load() {
         inst->label = o.s("label");
         inst->enc_mode = o.s("enc_mode", "auto");
         inst->capture = o.s("capture");
+        inst->capture_mode = (int)o.i("capture_mode", 0) == 1 ? 1 : 0;
         inst->max_procs = (int)o.i("max_procs", 1);
         inst->uuid = o.s("uuid");
         inst->login = o.s("login");

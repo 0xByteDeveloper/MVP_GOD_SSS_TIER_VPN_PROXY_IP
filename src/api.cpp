@@ -131,6 +131,7 @@ static std::string apiCreateInstance(const HttpRequest& rq) {
     o.addr = b.s("addr");                       // plain/socks manuel "ip:port"
     o.enc = b.s("enc", "auto");
     o.capture = b.s("capture");
+    o.capture_mode = (int)b.i("capture_mode", 0) == 1 ? 1 : 0;
     o.max_procs = (int)b.i("max_procs", 1);
     for (auto& h : b["hops"].arr) if (h.t == J::STR) o.hops.push_back(h.str);
     o.vpngate_hostname = b.s("vpngate_hostname");
@@ -165,7 +166,7 @@ static std::string apiInstanceAction(const HttpRequest& rq) {
     else if (action == "settings") {
         J b = parse_body(rq);
         ok = g_mgr->update_settings(id, b.s("capture"), (int)b.i("max_procs", 1),
-                                    b.s("label"), err);
+                                    (int)b.i("capture_mode", 0), b.s("label"), err);
     } else if (action == "" && rq.method == "DELETE") return g_mgr->destroy(id, err) ?
         "{\"ok\":true}" : "{\"err\":\"" + err + "\"}";
     else if (action == "attach") {

@@ -48,13 +48,20 @@ istatistik/telemetri sunucusu yok.
   `Tor yerel` — uyumluluk ve gecikme etkisi panelde gösterilir; hız
   düşürmeyen seçenek önerilir.
 
-## OTO-YAKALA (Proxifier'in gelişmişi — otomatik kutu atama)
+## OTO-YAKALA — MOD 1 / MOD 2 (Proxifier'in gelişmişi)
 
-Kutu ayarlarına süreç deseni yazılır (ör. `metin2client.exe`):
+Kutu AYARLAR'ında **mod combobox'ı** seçilir + süreç deseni yazılır:
+
+**MOD 1 — İLK N (kapasiteli)**: yeni açılan süreçler kapasiteye kadar bu kutuya girer:
 - **ilk açılan** `metin2client.exe` → desen eşleşen **1. boş kutuya** (instance1)
 - **ikinci açılan** → sıradaki eşleşen boş kutuya (instance3…)
 - kutu doluysa (kapasite aşıldıysa) → **diğer eşleşen kutuya** otomatik taşınır
-- her atama debug terminaline `OTO-YAKALA` olayı olarak düşer
+
+**MOD 2 — HEPSİ (açıksa bile)**: yazılan adı taşıyan TÜM süreçler bu kutuya bağlanır:
+- `brave.exe` yaz → brave'in **hepsi**, `chrome` yaz → chrome'un **hepsi**
+- **şu an process olarak AÇIK olanlar bile anında yakalanır** (kutu kurulur kurulmaz
+  mevcut süreçler taranır) — kapasite sınırsız
+- her atama debug terminaline `OTO-YAKALA MOD2` olayı olarak düşer
 
 ## Süreç yönlendirme
 
@@ -76,6 +83,8 @@ Kutu ayarlarına süreç deseni yazılır (ör. `metin2client.exe`):
 | `curl --socks5-hostname 127.0.0.1:22001 http://ip-api.com/json` | ✅ UK çıkışı `34.105.164.240` (gerçek dış IP) |
 | Motor içi `check` (SOCKS5 istemci → router → dış) | ✅ exit_ip kutuya yazıldı (United Kingdom / Google LLC) |
 | **OTO-YAKALA**: 2× `metin2client.exe` açıldı | ✅ pid→inst#1, pid→inst#2 otomatik + `AUTO_ASSIGN` olayları |
+| **OTO-YAKALA MOD 2**: açıkta 3× `metin2client.exe` varken kutu kuruldu | ✅ 3 pid de anında yakalandı (açıksa-bile modu) |
+| MOD değişimi (AYARLAR'dan MOD1→MOD2) | ✅ kutu anında tüm eşleşenleri kapsar |
 | Kalıcılık: motor yeniden başlat | ✅ kutular (zincir hops'ları dahil) geri yüklendi |
 | VPN Gate: liste + **.ovpn export** (10 KB gerçek config) | ✅ JP `public-vpn-187` (ayna: fdciabdul scraper) |
 | Zincir kurulumu (3 SOCKS5 hop, el sıkışma doğrulamalı seçim) | ✅ kurulur; bedava hop'lar dalgalıysa hata dürüstçe raporlanır → refresh yeni hop seçer |
@@ -83,7 +92,21 @@ Kutu ayarlarına süreç deseni yazılır (ör. `metin2client.exe`):
 | WebGUI: 6 boş kutu → AYARLAR → dolu kutular, 246 ülke | ✅ tarayıcıda doğrulandı (kanit/*.png) |
 
 Kullanım ekran görüntüleri: `kanit/01..08_*.png` (boş kutular, AYARLAR modalı,
-dolu kutular, OTO-YAKALA terminali, süreç arama, VPN Gate, geçmiş, kaynaklar).
+**MOD 2 modal görünümü**, dolu kutular, OTO-YAKALA terminali, süreç arama, VPN
+Gate, geçmiş, kaynaklar).
+
+## v2.1 — ağ dayanıklılığı ve oto-yakala MOD'ları
+
+- **`background_init HTTP 0 WinHttpSendRequest hatası` kökten çözüldü**: Windows
+  HTTP istemcisi artık **3 aşamalı** — (1) direkt WinHTTP (TLS 1.2+ sabit, Chrome
+  UA) → (2) sistem proxy'li WinHTTP → (3) ağ engelliyse **DoH ile IP çöz + saf
+  C++ SChannel TLS** (ISP/DNS zehirlemesine karşı). Her hata kodu Türkçe teşhis
+  metniyle raporlanır (`#12029 baglanti kurulamadi` gibi) — artık "HTTP 0" değil,
+  nedeni görür.
+- **Oto-yakala MOD 1 / MOD 2** (yukarıda).
+- **VPN Gate**: motor 5 dk liste önbelleği tutar — kutu yaparken "listeyi çek"
+  anında döner; çekme sırasında bekleme göstergesi + hata metni görünür.
+- **CMD konsolu**: `SetConsoleOutputCP(65001)` — Türkçe karakterler bozulmadan.
 
 ## Yapı
 

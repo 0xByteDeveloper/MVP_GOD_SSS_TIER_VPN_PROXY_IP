@@ -28,7 +28,9 @@ struct CreateOpts {
     std::string addr;             // plain/socks manuel "1.2.3.4:8080" (boşsa otomatik)
     std::string enc;              // auto | tls13 | tls12 | plain | chain2 | chain3 | tor3
     std::string capture;          // "metin2client.exe, game.exe" — oto-yakalama desenleri
-    int max_procs = 1;            // bu kutuya aynı anda bağlanacak süreç üst sınırı
+    int capture_mode = 0;         // 0=MOD1 ilk N (kapasiteye kadar, doluysa sıradaki kutu)
+                                  // 1=MOD2 HEPSİ (o adı taşıyan tüm süreçler — açık olanlar bile)
+    int max_procs = 1;            // bu kutuya aynı anda bağlanacak süreç üst sınırı (MOD1)
     std::vector<std::string> hops;// manuel zincir hops "ip:port" (chain için; boşsa otomatik)
     // vpngate: seçilen sunucu (ayarlama sırasında API'den alınan satır)
     std::string vpngate_hostname;
@@ -59,6 +61,7 @@ struct Instance {
     std::vector<std::string> attached_names;
     // oto-yakalama (kutu ayarları — monitor bunları izler)
     std::string capture;                 // desen listesi (virgülle)
+    int capture_mode = 0;                // 0=MOD1 ilk N · 1=MOD2 hepsi (açıksa bile)
     int max_procs = 1;
     // gerçeklik profili (uuid'den türetilmiş "insan gibi" kullanım deseni)
     int profile_activity = 0;            // 0..100 (%)
@@ -86,6 +89,8 @@ public:
     bool refresh(int id, std::string& err);          // zgettunnels yenile (aynı uuid)
     bool update_settings(int id, const std::string& capture, int max_procs,
                          const std::string& label, std::string& err);
+    bool update_settings(int id, const std::string& capture, int max_procs,
+                         int capture_mode, const std::string& label, std::string& err);
 
     // process yönlendirme
     bool attach(int id, long pid, const std::string& name, std::string& err);
