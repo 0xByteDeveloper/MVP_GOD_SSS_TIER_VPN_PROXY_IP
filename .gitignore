@@ -1,0 +1,10 @@
+# derleme çıktıları
+bin/
+hook/*.so
+hook/*.dll
+build/
+# çalışma verisi (kullanıcı makinesinde üretilir; örneği kanit klasöründe)
+data/
+# yerel kalıntılar
+*.log
+.DS_Store

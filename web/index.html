@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>MVP_GOD_SSS_TIER — Ücretsiz IP / Proxy / VPN Sistemi</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ================= ÜST BAR ================= -->
+<header id="topbar">
+  <div class="brand">
+    <span class="logo">MVP<span class="tier">_GOD_</span>SSS<span class="vpn">_TIER</span></span>
+    <span class="sub">Saf C++ motor + HTML yönetim — Hola · Tor · VPN Gate · zincir · PID yönlendirme</span>
+  </div>
+  <div class="createbar">
+    <button id="btnAddSlot" class="primary">+ KUTU EKLE</button>
+    <span class="dim" id="slotHint">kutular solda — boş kutunun AYARLAR'ı ile doldur</span>
+  </div>
+  <div id="chips" class="chips"></div>
+</header>
+
+<div id="layout">
+
+  <!-- ================= SOL: INSTANCE (KUTU) IZGARASI ================= -->
+  <aside id="instpanel">
+    <div class="panel-title">Instance Kutuları <span id="instCount" class="count"></span></div>
+    <div id="instGrid" class="instgrid"></div>
+    <div class="panel-title" style="border-top:1px solid var(--line)">
+      Sağlayıcılar (sömürüsüz)</div>
+    <div class="side-block small">
+      <div>· <b>HOLA</b>: her kutu = yeni ücretsiz kullanıcı (uuid bizim üretemiz);
+        süre bitince <b>NEW USER MODE</b></div>
+      <div>· <b>TOR</b>: yerel Tor SOCKS (9050) yoksa otomatik 3-zincir</div>
+      <div>· <b>VPN GATE</b>: kamu VPN'leri — .ovpn export (OpenVPN istemcisi)</div>
+      <div>· <b>PROXY LİSTESİ</b>: canlı GitHub listeleri (otomatik seçim)</div>
+      <div>· <b>MANUEL</b>: socks/http ip:port elle girilebilir</div>
+    </div>
+  </aside>
+
+  <!-- ================= MERKEZ: SEKMELER ================= -->
+  <main id="center">
+    <nav id="tabs">
+      <button data-tab="dash" class="active">Instance</button>
+      <button data-tab="procs">Süreç Yönlendir</button>
+      <button data-tab="mon">Debug Terminal</button>
+      <button data-tab="vgate">VPN Gate</button>
+      <button data-tab="users">Kullanıcı Geçmişi</button>
+      <button data-tab="srcs">Kaynaklar</button>
+    </nav>
+
+    <section id="tab-dash" class="tabpage active">
+      <div id="dashBody">
+        <div class="dbox" style="max-width:420px">
+          <div class="k">Seçili kutu yok</div>
+          <div class="s">Soldaki kare kutulardan birine tıklayın ya da boş kutunun
+          <b>AYARLAR</b> düğmesiyle yeni instance oluşturun.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-procs" class="tabpage">
+      <div class="toolbar">
+        <input id="procSearch" type="text" placeholder="search_textbox: program ismi veya PID yaz..." spellcheck="false">
+        <button id="btnProcRefresh">Yenile</button>
+        <span id="procCount" class="count"></span>
+      </div>
+      <div class="toolbar" style="background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:8px">
+        <span class="dim">Seçili süreç →</span>
+        <select id="procTargetInst" style="background:var(--bg);border:1px solid var(--line);color:var(--fg);padding:4px 6px"></select>
+        <button id="btnAttach" class="primary mini">PID'Yİ İZLE</button>
+        <span class="dim" style="margin-left:14px">veya</span>
+        <input id="launchExe" type="text" placeholder="program yolu: C:\oyun\metin2client.exe / curl http://ip-api.com/json" spellcheck="false" style="flex:1;min-width:260px;background:var(--bg);border:1px solid var(--line);color:var(--fg);padding:5px 8px;border-radius:4px;font-family:Consolas,monospace">
+        <button id="btnLaunch" class="warn mini">LAUNCH (hook ile başlat)</button>
+      </div>
+      <div class="side-block small" style="padding:0 0 8px">
+        OTO-YAKALA: kutu ayarlarındaki desenler (ör: metin2client.exe) yeni açılan süreci
+        otomatik boş kutuya bağlar — instance1 doluysa ilk açılan instance3'e gider.
+      </div>
+      <table class="gt"><thead><tr>
+        <th>PID</th><th>Program</th><th>Komut satırı</th><th>Yönlendirme</th><th></th>
+      </tr></thead><tbody id="procBody"></tbody></table>
+    </section>
+
+    <section id="tab-mon" class="tabpage">
+      <div class="toolbar">
+        <input id="monFilter" type="text" placeholder="filtre: pid / program / ip (boş = hepsi)" spellcheck="false">
+        <label class="dim"><input type="checkbox" id="monOnlyVia"> yalnız yönlendirilenler</label>
+        <button id="btnMonSnap">Anlık tablo</button>
+        <span id="monCount" class="count"></span>
+      </div>
+      <div style="border:1px solid var(--line);border-radius:6px;max-height:40vh;overflow:auto" id="monEvents"></div>
+      <div class="panel-title" style="margin-top:10px">Anlık TCP tablosu (tüm PC — VPN'siz de çalışır)</div>
+      <table class="gt"><thead><tr>
+        <th>PID</th><th>Program</th><th>Yerel</th><th>Uzak</th><th>Instance</th>
+      </tr></thead><tbody id="monBody"></tbody></table>
+    </section>
+
+    <section id="tab-vgate" class="tabpage">
+      <div class="toolbar">
+        <input id="vgCountry" type="text" placeholder="ülke kodu (TR, DE, US... boş = hepsi)" spellcheck="false" style="max-width:220px">
+        <button id="btnVgFetch" class="primary">VPN Gate listesini çek (kamu VPN'ler)</button>
+        <span id="vgCount" class="count"></span>
+      </div>
+      <div class="side-block small" style="padding:0 0 8px">
+        SoftEther VPN Gate projesinin gönüllü sunucuları — puan sırasına göre en
+        iyiler. "KUTU YAP" ile instance kutusuna dönüşür (.ovpn export; gerçek
+        tünel için OpenVPN istemcisi gerekir — telemetrysiz kullanım için
+        motor config'i diskten verir).
+      </div>
+      <table class="gt"><thead><tr>
+        <th>Sunucu</th><th>Ülke</th><th>Hız</th><th>Ping</th><th>Oturum</th><th>Uptime</th><th>Puan</th><th></th>
+      </tr></thead><tbody id="vgBody"></tbody></table>
+    </section>
+
+    <section id="tab-users" class="tabpage">
+      <div class="toolbar">
+        <select id="userSel" style="background:var(--bg);border:1px solid var(--line);color:var(--fg);padding:5px 8px"></select>
+        <button id="btnUsersRefresh">Yenile</button>
+      </div>
+      <table class="gt"><thead><tr>
+        <th>Zaman</th><th>Olay</th><th>Detay</th>
+      </tr></thead><tbody id="userBody"></tbody></table>
+    </section>
+
+    <section id="tab-srcs" class="tabpage">
+      <div class="toolbar">
+        <select id="srcType" style="background:var(--bg);border:1px solid var(--line);color:var(--fg);padding:5px 8px">
+          <option value="">hepsi</option>
+          <option value="http">http (plain)</option>
+          <option value="socks5">socks5 (tor/manuel gibi)</option>
+          <option value="socks4">socks4</option>
+        </select>
+        <button id="btnSrcs" class="primary">Kaynaklardan çek (monosans + speedx + proxyscrape)</button>
+        <span id="srcCount" class="count"></span>
+      </div>
+      <div class="side-block small" style="padding:0 0 8px">
+        x1 araştırmasındaki ücretsiz proxy depoları — satırdaki "KUTU YAP" ile
+        instance olur (http → düz proxy kutusu, socks5 → SOCKS5 kutusu).
+      </div>
+      <table class="gt"><thead><tr>
+        <th>Adres</th><th>Tür</th><th>Kaynak</th><th></th>
+      </tr></thead><tbody id="srcBody"></tbody></table>
+    </section>
+  </main>
+
+  <!-- ================= SAĞ: DURUM + GLOBAL ================= -->
+  <aside id="sidepanel">
+    <div class="panel-title">Motor</div>
+    <div class="side-block" id="engineBox">—</div>
+    <div class="panel-title">TÜM PC Modu</div>
+    <div class="side-block">
+      <div class="switchrow">
+        <div id="swGlobal" class="switch" title="Windows: WinInet sistem proxy · Linux: çocuk süreçler env"></div>
+        <span id="swGlobalLbl" class="dim">kapalı</span>
+      </div>
+      <div class="side-block small" style="padding:6px 0 0">
+        Tüm bilgisayarın trafiği seçili instance'dan geçer.
+        Windows'ta WinInet sistem proxy'si kurulur; Linux'ta launch ile başlatılan
+        süreçler env üzerinden bağlanır.
+      </div>
+      <select id="globalInst" style="width:100%;margin-top:6px;background:var(--bg);border:1px solid var(--line);color:var(--fg);padding:4px 6px"></select>
+    </div>
+    <div class="panel-title">Şifreleme / Kurallar</div>
+    <div class="side-block small">
+      <div>· Hola trial portu: 22225 — 80 için absolute-form</div>
+      <div>· Şifreleme: kutu AYARLAR → TLS1.3/1.2, zincir 2-3 katman</div>
+      <div>· blocked=true → motor 8sn bekleyip yeni uuid dener</div>
+      <div>· Kullanıcı gerçekliği: data/logs/users/*.jsonl</div>
+      <div>· Kimlikler (uuid) motor tarafından üretilir — istemci yazılımı yok</div>
+    </div>
+  </aside>
+</div>
+
+<!-- ================= AYARLAR MODALI ================= -->
+<div id="modal" class="modalwrap">
+  <div class="modalbox">
+    <div class="modal-title">KUTU AYARLARI <span id="modalSlotLbl" class="dim"></span></div>
+
+    <div class="mrow">
+      <label class="mk">Sağlayıcı</label>
+      <select id="mProvider" class="mv">
+        <option value="hola">HOLA VPN — yeni kullanıcı trial (uuid bizde)</option>
+        <option value="plain">ÜCRETSİZ PROXY LİSTESİ — otomatik canlı seçim</option>
+        <option value="socks">MANUEL SOCKS5 — ip:port gir</option>
+        <option value="tor">TOR — yerel SOCKS yoksa 3-zincir (Tor benzeri)</option>
+        <option value="chain">ZİNCİR — 2/3 katman (Tor mantığında katmanlama)</option>
+        <option value="vpngate">VPN GATE — kamu VPN (ovpn export)</option>
+      </select>
+      <div id="mProviderNote" class="mnote"></div>
+    </div>
+
+    <div class="mrow" id="rowCountry">
+      <label class="mk">Ülke</label>
+      <select id="mCountry" class="mv"></select>
+    </div>
+
+    <div class="mrow" id="rowVgServer" style="display:none">
+      <label class="mk">VPN Gate sunucusu</label>
+      <select id="mVgServer" class="mv"></select>
+      <button id="btnVgLoad" class="mini">listeyi çek</button>
+    </div>
+
+    <div class="mrow" id="rowAddr" style="display:none">
+      <label class="mk">Manuel adres</label>
+      <input id="mAddr" class="mv" type="text" placeholder="1.2.3.4:8080 (boş = otomatik seçim)" spellcheck="false">
+    </div>
+
+    <div class="mrow" id="rowHops" style="display:none">
+      <label class="mk">Zincir hops</label>
+      <input id="mHops" class="mv" type="text" placeholder="boş = otomatik canlı seçim — veya ip:port,ip:port" spellcheck="false">
+    </div>
+
+    <div class="mrow">
+      <label class="mk">Etiket</label>
+      <input id="mLabel" class="mv" type="text" placeholder="x1 (boş = otomatik)" spellcheck="false">
+    </div>
+
+    <div class="mrow">
+      <label class="mk">Şifreleme</label>
+      <select id="mEnc" class="mv"></select>
+      <div id="mEncNote" class="mnote"></div>
+    </div>
+
+    <div class="mrow">
+      <label class="mk">Oto-yakala (süreç adı)</label>
+      <input id="mCapture" class="mv" type="text" placeholder="metin2client.exe, game.exe (virgülle)" spellcheck="false">
+    </div>
+
+    <div class="mrow">
+      <label class="mk">Kutu süreç kapasitesi</label>
+      <input id="mMaxProcs" class="mv" type="number" min="1" max="16" value="1" style="max-width:90px">
+      <span class="mnote">bu kutuya aynı anda bağlanacak süreç sayısı (doluysa sıradaki kutu)</span>
+    </div>
+
+    <div class="modal-btns">
+      <button id="btnModalSave" class="primary">KUTUYU DOLDUR (instance oluştur)</button>
+      <button id="btnModalCancel">vazgeç</button>
+    </div>
+    <div id="modalErr" class="modalerr"></div>
+  </div>
+</div>
+
+<!-- ================= ALT: DEBUG KONSOL ================= -->
+<footer id="consolebar">
+  <div class="console-title">
+    <span>Debug Konsolu (toplu kayıt: metin seç → kopyala)</span>
+    <button id="btnConClear">temizle</button>
+    <label><input type="checkbox" id="conAuto" checked> otomatik akış</label>
+    <span id="conSeq" style="margin-left:auto"></span>
+  </div>
+  <div id="console" class="console"></div>
+</footer>
+
+<div id="busy"></div>
+<script src="app.js"></script>
+</body>
+</html>

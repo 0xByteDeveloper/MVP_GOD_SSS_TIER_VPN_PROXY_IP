@@ -1,0 +1,261 @@
+/* GOD_SSS_TIER_VPN — IDA tarzı koyu tema (referans: MVP_GOD_SSS_TIER_SIMULATOR_UI) */
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #1c2129;
+  --fg: #c9d1d9; --dim: #8b949e; --line: #30363d;
+  --acc: #58a6ff; --acc2: #1f6feb;
+  --ok: #3fb950; --warn: #d29922; --err: #f85149; --mag: #bc8cff;
+  --code: #e6edf3;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font: 13px/1.45 "Segoe UI", system-ui, sans-serif;
+  background: var(--bg); color: var(--fg);
+  display: flex; flex-direction: column;
+}
+
+/* ---------- üst bar ---------- */
+#topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 6px 12px; background: var(--bg2); border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.brand .logo { font-weight: 800; font-size: 15px; color: var(--mag); letter-spacing: .5px; }
+.brand .logo .tier { color: var(--warn); }
+.brand .logo .vpn { color: var(--acc); }
+.brand .sub { color: var(--dim); font-size: 11px; margin-left: 10px; }
+.createbar { display: flex; gap: 6px; flex: 1; min-width: 560px; align-items: center; }
+.createbar select, .createbar input {
+  background: var(--bg); border: 1px solid var(--line); color: var(--fg);
+  padding: 5px 8px; font-family: Consolas, monospace; font-size: 12px; border-radius: 4px;
+}
+.createbar #selCountry { max-width: 220px; }
+.createbar #inLabel { width: 90px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  background: var(--bg3); border: 1px solid var(--line); border-radius: 10px;
+  padding: 1px 9px; font-size: 11px; color: var(--dim); font-family: Consolas, monospace;
+}
+.chip b { color: var(--fg); font-weight: 600; }
+.chip.on b { color: var(--ok); }
+
+button {
+  background: var(--bg3); color: var(--fg); border: 1px solid var(--line);
+  padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+button:hover { border-color: var(--acc); color: #fff; }
+button.primary { background: var(--acc2); border-color: var(--acc2); color: #fff; font-weight: 600; }
+button.primary:hover { background: var(--acc); }
+button.warn { background: #3d2e00; border-color: var(--warn); color: var(--warn); }
+button.danger { background: #3d0d0d; border-color: var(--err); color: var(--err); }
+button.big { width: 100%; padding: 9px; font-size: 13px; margin-top: 8px; }
+button.mini { padding: 2px 8px; font-size: 11px; }
+
+/* ---------- ana yerleşim ---------- */
+#layout { flex: 1; display: flex; min-height: 0; }
+
+/* sol: instanslar */
+#instpanel {
+  width: 330px; min-width: 240px; background: var(--bg2);
+  border-right: 1px solid var(--line); display: flex; flex-direction: column;
+}
+.panel-title {
+  padding: 6px 10px; font-size: 11px; color: var(--dim); text-transform: uppercase;
+  letter-spacing: .5px; border-bottom: 1px solid var(--line); background: var(--bg3);
+}
+.panel-title .count { color: var(--acc); margin-left: 4px; }
+.instlist { flex: 1; overflow-y: auto; }
+.instcard {
+  border-bottom: 1px solid #21262d; padding: 7px 9px; cursor: pointer; position: relative;
+}
+.instcard:hover { background: var(--bg3); }
+.instcard.sel { background: #12233f; border-left: 2px solid var(--acc); }
+.instcard .row1 { display: flex; align-items: baseline; gap: 8px; font-family: Consolas, monospace; }
+.instcard .lbl { color: var(--warn); font-weight: 700; }
+.instcard .ctry { color: var(--acc); }
+.instcard .st { margin-left: auto; font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px solid; }
+.instcard .st.RUNNING { color: var(--ok); border-color: var(--ok); }
+.instcard .st.ERROR { color: var(--err); border-color: var(--err); }
+.instcard .row2 { display: flex; gap: 10px; color: var(--dim); font-size: 11px; margin-top: 3px; font-family: Consolas, monospace; }
+.instcard .ip { color: var(--ok); }
+.instcard .row3 { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.instcard .muted { color: var(--dim); font-size: 10px; margin-top: 4px; }
+
+/* merkez */
+#center { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
+#tabs {
+  display: flex; background: var(--bg2); border-bottom: 1px solid var(--line);
+}
+#tabs button {
+  background: none; border: none; border-right: 1px solid var(--line); color: var(--dim);
+  padding: 8px 16px; border-radius: 0; font-size: 12px;
+}
+#tabs button.active { color: var(--fg); background: var(--bg); border-top: 2px solid var(--acc); }
+.tabpage { flex: 1; overflow: auto; padding: 12px; display: none; min-height: 0; }
+.tabpage.active { display: block; }
+
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.toolbar input[type=text] {
+  flex: 1; min-width: 200px; background: var(--bg); border: 1px solid var(--line);
+  color: var(--fg); padding: 6px 10px; border-radius: 4px; font-family: Consolas, monospace;
+}
+.toolbar .count { color: var(--dim); font-size: 11px; }
+
+/* tablolar */
+table.gt { border-collapse: collapse; width: 100%; font-size: 12px; }
+table.gt th {
+  text-align: left; color: var(--dim); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .5px; border-bottom: 1px solid var(--line); padding: 4px 8px;
+  position: sticky; top: 0; background: var(--bg2);
+}
+table.gt td { padding: 4px 8px; border-bottom: 1px solid #21262d; font-family: Consolas, monospace; }
+table.gt tr:hover td { background: var(--bg3); }
+table.gt tr.sel td { background: #12233f; }
+.mono { font-family: Consolas, monospace; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--err); }
+.dim { color: var(--dim); } .acc { color: var(--acc); } .mag { color: var(--mag); }
+
+/* instance detayı */
+.dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.dbox { background: var(--bg2); border: 1px solid var(--line); border-radius: 6px; padding: 10px; }
+.dbox .k { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+.dbox .v { font-family: Consolas, monospace; font-size: 15px; margin-top: 4px; color: var(--code); }
+.dbox .v.big { color: var(--ok); font-size: 18px; }
+.dbox .s { color: var(--dim); font-size: 11px; margin-top: 2px; }
+
+/* debug terminal akışları */
+.evline {
+  font-family: Consolas, monospace; font-size: 11.5px; padding: 2px 8px;
+  border-bottom: 1px solid #161b22; white-space: pre-wrap;
+}
+.evline .t { color: var(--dim); }
+.evline .pid { color: var(--acc); }
+.evline .via { color: var(--mag); }
+.evline .rmt { color: var(--code); }
+
+/* sağ panel */
+#sidepanel {
+  width: 290px; min-width: 250px; background: var(--bg2);
+  border-left: 1px solid var(--line); display: flex; flex-direction: column; overflow-y: auto;
+}
+.side-block { padding: 8px 10px; font-size: 12px; }
+.side-block.small { font-size: 11px; color: var(--dim); }
+.kv { display: flex; justify-content: space-between; padding: 2px 0; font-family: Consolas, monospace; }
+.kv .k { color: var(--dim); }
+.kv .v { color: var(--code); }
+.switchrow { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.switch {
+  width: 40px; height: 20px; border-radius: 12px; background: var(--bg3);
+  border: 1px solid var(--line); position: relative; cursor: pointer; flex-shrink: 0;
+}
+.switch::after {
+  content: ""; position: absolute; top: 1px; left: 1px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--dim); transition: all .15s;
+}
+.switch.on { background: #123524; border-color: var(--ok); }
+.switch.on::after { left: 21px; background: var(--ok); }
+
+/* alt: debug konsolu */
+#consolebar {
+  height: 190px; display: flex; flex-direction: column; background: #0a0d12;
+  border-top: 1px solid var(--line);
+}
+#consolebar.min { height: 34px; }
+#consolebar.min #console { display: none; }
+.console-title {
+  display: flex; align-items: center; gap: 12px; padding: 4px 12px; color: var(--dim);
+  font-size: 11px; background: var(--bg3); border-bottom: 1px solid var(--line);
+}
+.console-title span:first-child { color: var(--warn); text-transform: uppercase; letter-spacing: 1px; }
+#console {
+  flex: 1; overflow-y: auto; font-family: Consolas, monospace; font-size: 11.5px;
+  padding: 4px 10px; white-space: pre-wrap; color: #9fb0c0;
+}
+#console .okline { color: var(--ok); }
+#console .errline { color: var(--err); }
+#console .warnline { color: var(--warn); }
+#busy {
+  position: fixed; inset: 0; background: rgba(13, 17, 23, .75); display: none;
+  align-items: center; justify-content: center; color: var(--acc); z-index: 99;
+  font-family: Consolas, monospace;
+}
+#busy.on { display: flex; }
+
+@media (max-width: 1100px) { #sidepanel { display: none; } }
+@media (max-width: 780px) { #instpanel { display: none; } }
+
+/* ================= MVP_GOD_SSS_TIER — KARE KUTU INSTANCE'LAR ================= */
+#instpanel { width: 372px; }
+.instgrid {
+  flex: 1; overflow-y: auto; padding: 10px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+  align-content: start;
+}
+.tile {
+  position: relative; display: flex; flex-direction: column;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px; min-height: 168px; cursor: pointer;
+  box-shadow: 0 1px 0 rgba(0,0,0,.3);
+}
+.tile:hover { border-color: var(--acc); }
+.tile.sel { border-color: var(--acc); background: #12233f; box-shadow: 0 0 0 1px var(--acc); }
+.tile.empty {
+  border: 2px dashed #3d444d; background: transparent;
+  align-items: center; justify-content: space-between; text-align: center;
+}
+.tile.empty .tile-big { font-size: 20px; font-weight: 800; letter-spacing: 2px; margin-top: 14px; }
+.tile.empty .tile-note { font-size: 10px; padding: 0 6px; }
+.btn-ayarlar { width: 92%; margin: 0 0 4px; padding: 7px 6px; font-size: 12px; font-weight: 700; }
+.tile-top { display: flex; align-items: baseline; gap: 6px; font-family: Consolas, monospace; }
+.tile-lbl { color: var(--warn); font-weight: 800; font-size: 13px; }
+.tile .ctry { color: var(--acc); font-size: 11px; }
+.tile .st { margin-left: auto; font-size: 9.5px; padding: 0 6px; border-radius: 8px; border: 1px solid; }
+.tile .st.RUNNING { color: var(--ok); border-color: var(--ok); }
+.tile .st.OVPN { color: var(--mag); border-color: var(--mag); }
+.tile .st.ERROR { color: var(--err); border-color: var(--err); }
+.tile .st.INIT { color: var(--warn); border-color: var(--warn); }
+.tile-mid { display: flex; flex-direction: column; margin: 6px 0 2px; }
+.tile-big.ip { color: var(--ok); font-family: Consolas, monospace; font-size: 15px; font-weight: 700; }
+.tile-prov { color: var(--dim); font-size: 10px; letter-spacing: .5px; margin-top: 2px; }
+.tile-note { font-size: 10px; font-family: Consolas, monospace; }
+.tile-cap {
+  margin-top: 4px; font-size: 10px; color: var(--mag); font-family: Consolas, monospace;
+  background: #1d1622; border: 1px solid #3d2f4f; border-radius: 4px; padding: 2px 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tile-btns { display: flex; gap: 4px; margin-top: auto; flex-wrap: wrap; }
+
+/* ---- AYARLAR MODALI ---- */
+.modalwrap {
+  position: fixed; inset: 0; background: rgba(4, 8, 14, .78); display: none;
+  align-items: center; justify-content: center; z-index: 200;
+}
+.modalwrap.on { display: flex; }
+.modalbox {
+  width: 560px; max-width: 94vw; max-height: 88vh; overflow-y: auto;
+  background: var(--bg2); border: 1px solid var(--acc2); border-radius: 10px;
+  padding: 14px 16px; box-shadow: 0 12px 48px rgba(0,0,0,.6);
+}
+.modal-title {
+  font-size: 14px; font-weight: 800; color: var(--mag); letter-spacing: .5px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 10px;
+}
+.mrow { margin-bottom: 10px; }
+.mk { display: block; font-size: 10.5px; color: var(--dim); text-transform: uppercase;
+      letter-spacing: .5px; margin-bottom: 3px; }
+.mv {
+  width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--fg);
+  padding: 7px 9px; border-radius: 5px; font-family: Consolas, monospace; font-size: 12px;
+}
+.mv:focus { border-color: var(--acc); outline: none; }
+.mnote { font-size: 10.5px; color: var(--dim); margin-top: 3px; }
+.modal-btns { display: flex; gap: 8px; margin-top: 12px; }
+.modalerr { color: var(--err); font-size: 12px; margin-top: 8px; font-family: Consolas, monospace; }
+
+/* OTO-YAKALA terminal satırı */
+.autol {
+  font-family: Consolas, monospace; font-size: 11.5px; padding: 2px 8px;
+  border-bottom: 1px solid #161b22; white-space: pre-wrap; background: #161226;
+}
+
+@media (max-width: 780px) { #instpanel { display: none; } }
